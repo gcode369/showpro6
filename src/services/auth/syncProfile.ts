@@ -9,26 +9,32 @@ export async function syncExistingProfile(userId: string) {
     const role = user?.user_metadata?.role || 'client';
     const table = role === 'agent' ? 'agent_profiles' : 'client_profiles';
 
-    // Update profile with missing fields
+    // Check if profile exists
+    const { data: existingProfile } = await supabase
+      .from(table)
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    // Create or update profile
     const { error: updateError } = await supabase
       .from(table)
       .upsert({
         user_id: userId,
-        areas: [],
-        languages: [],
-        certifications: [],
-        subscription_status: 'trial',
-        subscription_tier: 'basic'
-      }, { 
-        onConflict: 'user_id',
-        ignoreDuplicates: false 
+        name: existingProfile?.name || user?.user_metadata?.name || '',
+        areas: existingProfile?.areas || [],
+        languages: existingProfile?.languages || [],
+        certifications: existingProfile?.certifications || [],
+        ...(role === 'agent' && {
+          subscription_status: existingProfile?.subscription_status || 'trial',
+          subscription_tier: existingProfile?.subscription_tier || 'basic'
+        })
       });
 
     if (updateError) throw updateError;
-
     return true;
   } catch (err) {
     console.error('Profile sync error:', err);
-    return false;
+    throw err;
   }
 }

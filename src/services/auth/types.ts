@@ -4,6 +4,10 @@ import type { AuthSession, UserRole } from '../../types/auth';
 export type ProfileData = {
   user_id: string;
   name: string;
+  phone?: string;
+  areas: string[];
+  languages: string[];
+  certifications: string[];
   subscription_status?: 'trial' | 'active' | 'inactive';
   subscription_tier?: 'basic' | 'premium';
 };

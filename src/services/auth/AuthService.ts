@@ -1,8 +1,62 @@
 import { supabase } from '../supabase';
 import { getUserProfile } from './profileService';
-import type { AuthUser } from '../../types/auth';
+import type { AuthUser, UserRegistrationData } from '../../types/auth';
 
 export class AuthService {
+  async register(email: string, password: string, data: UserRegistrationData): Promise<{ user: AuthUser }> {
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: data.name,
+            role: data.role
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      if (!authData.user) throw new Error('Registration failed - no user created');
+
+      // Create profile
+      const { error: profileError } = await supabase
+        .from(data.role === 'agent' ? 'agent_profiles' : 'client_profiles')
+        .insert({
+          user_id: authData.user.id,
+          name: data.name,
+          phone: data.phone,
+          areas: data.areas || [],
+          languages: data.languages || [],
+          certifications: data.certifications || [],
+          ...(data.role === 'agent' && {
+            subscription_status: 'trial',
+            subscription_tier: 'basic'
+          })
+        });
+
+      if (profileError) throw profileError;
+
+      return {
+        user: {
+          id: authData.user.id,
+          email: authData.user.email!,
+          name: data.name,
+          role: data.role,
+          phone: data.phone,
+          areas: data.areas || [],
+          languages: data.languages || [],
+          certifications: data.certifications || [],
+          subscriptionStatus: data.role === 'agent' ? 'trial' : undefined,
+          subscriptionTier: data.role === 'agent' ? 'basic' : undefined
+        }
+      };
+    } catch (err) {
+      console.error('Registration error:', err);
+      throw err;
+    }
+  }
+
   async login(email: string, password: string): Promise<{ user: AuthUser }> {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -20,6 +74,10 @@ export class AuthService {
       email: data.session.user.email!,
       name: profile.name,
       role: userRole,
+      phone: profile.phone,
+      areas: profile.areas || [],
+      languages: profile.languages || [],
+      certifications: profile.certifications || [],
       subscriptionStatus: 'subscription_status' in profile ? profile.subscription_status : undefined,
       subscriptionTier: 'subscription_tier' in profile ? profile.subscription_tier : undefined
     };
