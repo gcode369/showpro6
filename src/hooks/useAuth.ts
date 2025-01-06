@@ -18,7 +18,12 @@ export function useAuth() {
       setUser(user);
 
       if (user.role === 'agent') {
-        navigate(user.subscriptionStatus === 'active' ? '/agent' : '/subscription');
+        // Check if subscription is needed
+        if (!user.subscriptionStatus || user.subscriptionStatus === 'inactive') {
+          navigate('/subscription');
+          return;
+        }
+        navigate('/agent');
       } else {
         navigate('/client');
       }
